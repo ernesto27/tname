@@ -1,38 +1,79 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
+	"sync"
 
+	"github.com/google/go-github/github"
 	"golang.org/x/net/html"
 )
 
 // homebrew
 // https://formulae.brew.sh/formula/dagger
 
-func main() {
-	url := "https://pkg.go.dev/search?q=docker&m=package"
+type ServiceResponse struct {
+	exists bool
+	url    string
+}
 
-	// Make the HTTP GET request
+type NameChecker interface {
+	Check(name string) (ServiceResponse, error)
+}
+
+type Github struct{}
+
+func (g Github) Check(name string) (ServiceResponse, error) {
+	client := github.NewClient(nil)
+
+	results, _, err := client.Search.Repositories(context.Background(), name, nil)
+	if err != nil {
+		return ServiceResponse{}, err
+	}
+
+	exists := false
+	url := ""
+	if len(results.Repositories) > 0 {
+		exists = true
+		url = results.Repositories[0].GetHTMLURL()
+	}
+
+	return ServiceResponse{
+		exists: exists,
+		url:    url,
+	}, nil
+}
+
+type GoPkg struct{}
+
+func (g GoPkg) Check(name string) (ServiceResponse, error) {
+	url := fmt.Sprintf("https://pkg.go.dev/search?q=%s&m=package", name)
+
 	response, err := http.Get(url)
 	if err != nil {
 		fmt.Println("Error:", err)
-		return
+		return ServiceResponse{}, err
 	}
 	defer response.Body.Close()
 
 	className := "go-GopherMessage"
 	tokenizer := html.NewTokenizer(response.Body)
 
-	if checkClass(tokenizer, className) {
-		fmt.Println("package not exists")
-	} else {
-		fmt.Println("package exists")
+	exists := true
+	if g.existsPackage(tokenizer, className) {
+		exists = false
 	}
+
+	return ServiceResponse{
+		exists: exists,
+		url:    url,
+	}, nil
 }
 
-func checkClass(tokenizer *html.Tokenizer, className string) bool {
+func (g GoPkg) existsPackage(tokenizer *html.Tokenizer, className string) bool {
 	for {
 		tokenType := tokenizer.Next()
 		switch tokenType {
@@ -47,4 +88,32 @@ func checkClass(tokenizer *html.Tokenizer, className string) bool {
 			}
 		}
 	}
+}
+
+func main() {
+	if len(os.Args) < 2 {
+		fmt.Println("Error: no package name")
+		return
+	}
+
+	packageName := os.Args[1]
+	fmt.Println(packageName)
+
+	wg := sync.WaitGroup{}
+	services := []NameChecker{Github{}, GoPkg{}}
+	wg.Add(2)
+
+	for _, s := range services {
+		go func(s NameChecker) {
+			defer wg.Done()
+			r, err := s.Check(packageName)
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+			fmt.Println(r)
+		}(s)
+	}
+
+	wg.Wait()
 }
