@@ -110,3 +110,51 @@ func (h Homebrew) Check(name string) (ServiceResponse, error) {
 		url:    url,
 	}, nil
 }
+
+type Npm struct{}
+
+func (n Npm) Check(name string) (ServiceResponse, error) {
+	url := fmt.Sprintf("https://registry.npmjs.org/%s", name)
+
+	response, err := http.Get(url)
+	if err != nil {
+		return ServiceResponse{}, err
+	}
+	defer response.Body.Close()
+
+	exists := true
+	if response.StatusCode == http.StatusNotFound {
+		exists = false
+	}
+
+	return ServiceResponse{
+		name:   "npm",
+		exists: exists,
+		url:    url,
+	}, nil
+}
+
+type Pypi struct{}
+
+func (p Pypi) Check(name string) (ServiceResponse, error) {
+
+	url := fmt.Sprintf("https://pypi.org/pypi/%s/json", name)
+
+	response, err := http.Get(url)
+	if err != nil {
+		return ServiceResponse{}, err
+	}
+	defer response.Body.Close()
+
+	exists := true
+	if response.StatusCode == http.StatusNotFound {
+		exists = false
+	}
+
+	return ServiceResponse{
+		name:   "pypi",
+		exists: exists,
+		url:    url,
+	}, nil
+
+}

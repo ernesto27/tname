@@ -82,7 +82,7 @@ func (m *model) View() string {
 
 func (m *model) getServicesInfo(querySearch string) {
 	wg := sync.WaitGroup{}
-	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}}
+	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}, Npm{}, Pypi{}}
 	wg.Add(len(services))
 
 	for _, s := range services {
