@@ -87,3 +87,26 @@ func (g GoPkg) existsPackage(tokenizer *html.Tokenizer, className string) bool {
 		}
 	}
 }
+
+type Homebrew struct{}
+
+func (h Homebrew) Check(name string) (ServiceResponse, error) {
+	url := fmt.Sprintf("https://formulae.brew.sh/formula/%s", name)
+
+	response, err := http.Get(url)
+	if err != nil {
+		return ServiceResponse{}, err
+	}
+	defer response.Body.Close()
+
+	exists := true
+	if response.StatusCode == http.StatusNotFound {
+		exists = false
+	}
+
+	return ServiceResponse{
+		name:   "homebrew",
+		exists: exists,
+		url:    url,
+	}, nil
+}

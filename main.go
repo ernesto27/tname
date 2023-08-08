@@ -68,7 +68,7 @@ func (m *model) View() string {
 	}
 
 	var s strings.Builder
-	s.WriteString(styleTitle("Response for " + querySearch))
+	s.WriteString(styleTitle("Results for name " + querySearch))
 	for _, item := range m.items {
 		if item.exists {
 			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists - %s", item.name, item.url)))
@@ -82,7 +82,7 @@ func (m *model) View() string {
 
 func (m *model) getServicesInfo(querySearch string) {
 	wg := sync.WaitGroup{}
-	services := []NameChecker{Github{}, GoPkg{}}
+	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}}
 	wg.Add(len(services))
 
 	for _, s := range services {
@@ -114,7 +114,6 @@ func main() {
 	querySearch = os.Args[1]
 
 	progress := progress.New(progress.WithScaledGradient("#FF7CCB", "#FDFF8C"))
-
 	m := model{
 		progress:  progress,
 		isLoading: true,
