@@ -1,93 +1,108 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
+	"time"
 
-	"github.com/google/go-github/github"
-	"golang.org/x/net/html"
+	"github.com/charmbracelet/bubbles/progress"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// homebrew
-// https://formulae.brew.sh/formula/dagger
+var querySearch string
 
-type ServiceResponse struct {
-	exists bool
-	url    string
+type model struct {
+	isLoading bool
+	items     []ServiceResponse
+	progress  progress.Model
+	percent   float64
+	mu        *sync.Mutex
 }
 
-type NameChecker interface {
-	Check(name string) (ServiceResponse, error)
+func (m model) Init() tea.Cmd {
+	return tickCmd()
 }
 
-type Github struct{}
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+	case tickMsg:
+		m.mu.Lock()
+		m.percent += 0.01
+		m.mu.Unlock()
 
-func (g Github) Check(name string) (ServiceResponse, error) {
-	client := github.NewClient(nil)
+		if m.percent >= 1.0 {
+			m.isLoading = false
+			return m, nil
+		}
 
-	results, _, err := client.Search.Repositories(context.Background(), name, nil)
-	if err != nil {
-		return ServiceResponse{}, err
+		return m, tickCmd()
+
 	}
 
-	exists := false
-	url := ""
-	if len(results.Repositories) > 0 {
-		exists = true
-		url = results.Repositories[0].GetHTMLURL()
-	}
-
-	return ServiceResponse{
-		exists: exists,
-		url:    url,
-	}, nil
+	var cmd tea.Cmd
+	return m, cmd
 }
 
-type GoPkg struct{}
+var styleTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).MarginBottom(1).MarginLeft(2).MarginTop(1).Bold(true).Render
+var styleOk = lipgloss.NewStyle().Foreground(lipgloss.Color("#0ac782")).MarginBottom(1).MarginLeft(1).Render
+var styleError = lipgloss.NewStyle().Foreground(lipgloss.Color("#cf5159")).MarginBottom(1).MarginLeft(1).Render
 
-func (g GoPkg) Check(name string) (ServiceResponse, error) {
-	url := fmt.Sprintf("https://pkg.go.dev/search?q=%s&m=package", name)
+const (
+	padding  = 2
+	maxWidth = 80
+)
 
-	response, err := http.Get(url)
-	if err != nil {
-		fmt.Println("Error:", err)
-		return ServiceResponse{}, err
-	}
-	defer response.Body.Close()
+func (m *model) View() string {
 
-	className := "go-GopherMessage"
-	tokenizer := html.NewTokenizer(response.Body)
-
-	exists := true
-	if g.existsPackage(tokenizer, className) {
-		exists = false
+	if m.isLoading {
+		pad := strings.Repeat(" ", padding)
+		return " title " +
+			pad + m.progress.ViewAs(m.percent) + "\n\n"
 	}
 
-	return ServiceResponse{
-		exists: exists,
-		url:    url,
-	}, nil
-}
-
-func (g GoPkg) existsPackage(tokenizer *html.Tokenizer, className string) bool {
-	for {
-		tokenType := tokenizer.Next()
-		switch tokenType {
-		case html.ErrorToken:
-			return false
-		case html.StartTagToken, html.SelfClosingTagToken:
-			token := tokenizer.Token()
-			for _, attr := range token.Attr {
-				if attr.Key == "class" && strings.Contains(attr.Val, className) {
-					return true
-				}
-			}
+	var s strings.Builder
+	s.WriteString(styleTitle("Response for " + querySearch))
+	for _, item := range m.items {
+		if item.exists {
+			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists - %s", item.name, item.url)))
+		} else {
+			s.WriteString(styleOk(fmt.Sprintf("\n \u2713 - %s - is available!", item.name)))
 		}
 	}
+
+	return s.String()
+}
+
+func (m *model) getServicesInfo(querySearch string) {
+	wg := sync.WaitGroup{}
+	services := []NameChecker{Github{}, GoPkg{}}
+	wg.Add(len(services))
+
+	for _, s := range services {
+		go func(s NameChecker) {
+			defer wg.Done()
+			r, err := s.Check(querySearch)
+
+			if err != nil {
+				fmt.Println("Error:", err)
+				return
+			}
+
+			m.mu.Lock()
+			m.percent += float64(100/len(services)) / 100
+			m.items = append(m.items, r)
+			m.mu.Unlock()
+		}(s)
+	}
+
+	wg.Wait()
 }
 
 func main() {
@@ -96,24 +111,29 @@ func main() {
 		return
 	}
 
-	packageName := os.Args[1]
-	fmt.Println(packageName)
+	querySearch = os.Args[1]
 
-	wg := sync.WaitGroup{}
-	services := []NameChecker{Github{}, GoPkg{}}
-	wg.Add(2)
+	progress := progress.New(progress.WithScaledGradient("#FF7CCB", "#FDFF8C"))
 
-	for _, s := range services {
-		go func(s NameChecker) {
-			defer wg.Done()
-			r, err := s.Check(packageName)
-			if err != nil {
-				fmt.Println("Error:", err)
-				return
-			}
-			fmt.Println(r)
-		}(s)
+	m := model{
+		progress:  progress,
+		isLoading: true,
+		mu:        &sync.Mutex{},
 	}
 
-	wg.Wait()
+	go m.getServicesInfo(querySearch)
+
+	p := tea.NewProgram(&m, tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Println("Error running program:", err)
+		os.Exit(1)
+	}
+}
+
+type tickMsg time.Time
+
+func tickCmd() tea.Cmd {
+	return tea.Tick(time.Second, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
 }
