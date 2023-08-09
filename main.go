@@ -70,10 +70,10 @@ func (m *model) View() string {
 	var s strings.Builder
 	s.WriteString(styleTitle("Results for name " + querySearch))
 	for _, item := range m.items {
-		if item.exists {
-			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists - %s", item.name, item.url)))
-		} else {
+		if item.available {
 			s.WriteString(styleOk(fmt.Sprintf("\n \u2713 - %s - is available!", item.name)))
+		} else {
+			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists - %s", item.name, item.url)))
 		}
 	}
 
@@ -82,7 +82,7 @@ func (m *model) View() string {
 
 func (m *model) getServicesInfo(querySearch string) {
 	wg := sync.WaitGroup{}
-	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}, Npm{}, Pypi{}}
+	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}, Npm{}, Pypi{}, RubyGems{}, Crate{}, Packagist{}}
 	wg.Add(len(services))
 
 	for _, s := range services {
