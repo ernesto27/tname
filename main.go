@@ -12,6 +12,11 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+const (
+	padding  = 2
+	maxWidth = 80
+)
+
 var querySearch string
 
 type model struct {
@@ -43,6 +48,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return m, tickCmd()
+	case tea.WindowSizeMsg:
+		m.progress.Width = msg.Width - padding*2 - 4
+		if m.progress.Width > maxWidth {
+			m.progress.Width = maxWidth
+		}
+		return m, nil
 
 	}
 
@@ -54,16 +65,11 @@ var styleTitle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ffffff")).Margi
 var styleOk = lipgloss.NewStyle().Foreground(lipgloss.Color("#0ac782")).MarginBottom(1).MarginLeft(1).Render
 var styleError = lipgloss.NewStyle().Foreground(lipgloss.Color("#cf5159")).MarginBottom(1).MarginLeft(1).Render
 
-const (
-	padding  = 2
-	maxWidth = 80
-)
-
 func (m *model) View() string {
 
 	if m.isLoading {
 		pad := strings.Repeat(" ", padding)
-		return " title " +
+		return "\n   Searching name on github, homebrew, gopkp, rubygems, pypi, npm services, dns ... \n\n " +
 			pad + m.progress.ViewAs(m.percent) + "\n\n"
 	}
 
