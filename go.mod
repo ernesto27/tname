@@ -1,4 +1,4 @@
-module namechecker
+module github.com/ernesto27/tname
 
 go 1.20
 
