@@ -7,8 +7,11 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/google/go-github/github"
+	"github.com/likexian/whois"
+	whoisparser "github.com/likexian/whois-parser"
 	"golang.org/x/net/html"
 )
 
@@ -216,6 +219,46 @@ func (p Packagist) Check(name string) (ServiceResponse, error) {
 		available: available,
 		url:       url,
 	}, nil
+}
+
+func checkDNS(name string) ([]ServiceResponse, error) {
+	tlds := []string{"com", "net", "org", "io"}
+	sr := []ServiceResponse{}
+
+	s := sync.WaitGroup{}
+	s.Add(len(tlds))
+
+	for _, t := range tlds {
+		go func(t string) {
+			defer s.Done()
+			domain := name + "." + t
+			whois_raw, err := whois.Whois(domain)
+			url := fmt.Sprintf("https://%s", domain)
+			r := ServiceResponse{
+				name:      url,
+				available: false,
+			}
+
+			if err != nil {
+				r.available = true
+				sr = append(sr, r)
+				return
+			}
+
+			_, err = whoisparser.Parse(whois_raw)
+			if err != nil {
+				r.available = true
+				sr = append(sr, r)
+				return
+			}
+
+			sr = append(sr, r)
+		}(t)
+	}
+
+	s.Wait()
+
+	return sr, nil
 }
 
 func checkStatus404(url string) (bool, error) {

@@ -73,7 +73,11 @@ func (m *model) View() string {
 		if item.available {
 			s.WriteString(styleOk(fmt.Sprintf("\n \u2713 - %s - is available!", item.name)))
 		} else {
-			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists - %s", item.name, item.url)))
+			url := ""
+			if item.url != "" {
+				url = fmt.Sprintf(" - %s", item.url)
+			}
+			s.WriteString(styleError(fmt.Sprintf("\n \u2717 - %s - already exists %s", item.name, url)))
 		}
 	}
 
@@ -83,7 +87,8 @@ func (m *model) View() string {
 func (m *model) getServicesInfo(querySearch string) {
 	wg := sync.WaitGroup{}
 	services := []NameChecker{Github{}, GoPkg{}, Homebrew{}, Npm{}, Pypi{}, RubyGems{}, Crate{}, Packagist{}}
-	wg.Add(len(services))
+	sCount := len(services) + 1
+	wg.Add(sCount)
 
 	for _, s := range services {
 		go func(s NameChecker) {
@@ -94,15 +99,27 @@ func (m *model) getServicesInfo(querySearch string) {
 				fmt.Println("Error:", err)
 				return
 			}
-
-			m.mu.Lock()
-			m.percent += float64(100/len(services)) / 100
-			m.items = append(m.items, r)
-			m.mu.Unlock()
+			m.updateValues(sCount, []ServiceResponse{r})
 		}(s)
 	}
 
+	go func() {
+		defer wg.Done()
+		sr, err := checkDNS(querySearch)
+		if err != nil {
+			fmt.Println("Error:", err)
+		}
+		m.updateValues(sCount, sr)
+	}()
+
 	wg.Wait()
+}
+
+func (m *model) updateValues(count int, sr []ServiceResponse) {
+	m.mu.Lock()
+	m.percent += float64(100/count) / 100
+	m.items = append(m.items, sr...)
+	m.mu.Unlock()
 }
 
 func main() {

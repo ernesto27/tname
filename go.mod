@@ -15,6 +15,9 @@ require (
 	github.com/charmbracelet/harmonica v0.2.0 // indirect
 	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
+	github.com/likexian/gokit v0.25.13 // indirect
+	github.com/likexian/whois v1.15.0 // indirect
+	github.com/likexian/whois-parser v1.24.8 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.18 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
