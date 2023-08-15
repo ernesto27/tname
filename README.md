@@ -36,3 +36,8 @@ Also if you have Golang installed you can install it with:
 go install github.com/ernesto27/tname@latest
 ```
 
+## Example 
+
+```bash 
+tname yourprojectname
+```
