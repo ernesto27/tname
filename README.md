@@ -33,6 +33,6 @@ brew install ernesto27/tools/tname
 Also if you have Golang installed you can install it with:
 
 ```bash
-go install github.com/ernesto27/tname/releases/latest
+go install github.com/ernesto27/tname@latest
 ```
 
