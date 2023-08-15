@@ -14,6 +14,10 @@ Services
 - Packagist
 - DNS
 
+![demo](https://github.com/ernesto27/tname/assets/1366157/7bfd6fb5-d363-4ab7-bc92-241a9c6506c7)
+
+
+
 ## Install
 
 Go to release page and download the binary for your OS.
