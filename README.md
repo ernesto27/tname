@@ -1,6 +1,6 @@
 # tname checker
 
-This is a TUI app that check differentes services if your new project name is available.
+This is a TUI app that check in differents services if your new project name is available.
 
 Services
 
